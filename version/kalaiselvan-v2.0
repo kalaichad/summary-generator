@@ -1,0 +1,339 @@
+#!/bin/bash
+clear
+function variable {
+place="Machilipatnam"
+name="kalaiselvan"
+scan_DOcode="AI_067"
+
+}
+function title {
+echo
+echo -e "                                                         \033[1;32m  LIC ${place} DO\033[0m"
+echo -e "                                                    \033[4;31mThis script writed by KALAISELVAN\033[0m"
+echo 
+echo -e "                                                                \033[4;35mDISCLAMER\033[0m"
+echo "                         If you upload the DVD file then don't delete the DVD file run this command 'kalaiselvan'
+                                      it will upload files on IT Programmer after you can delete that DVD file."
+echo
+}
+
+if [ ! -s ./info.conf ]
+then
+	echo "info.conf file is not avilable!!!"
+	exit 1
+else
+	username=$(grep -i 'username' ./info.conf | awk -F = '{ print $2 }')
+	ipaddr=$(grep -i 'ipaddr' ./info.conf | awk -F = '{ print $2 }')
+fi
+
+it_programmer="${username}@${ipaddr}:/backup/D067"
+
+#cleate dir variables
+function files_create {
+masterdir=/root/${name}/
+softfile=/root/${name}/softfile/
+softfiledir=/root/${name}/softfile/soft/
+softerror=/root/${name}/softfile/error.log
+summarytemp=/root/${name}/softfile/summarytemp/
+softlogentry=/root/${name}/softfile/soft.log
+summarylogentry=/root/${name}/softfile/summary.csv
+}
+#check dirctory and file
+function dir_checking {
+#check parent dir
+if [ ! -d ${masterdir} ]
+then
+    echo
+    mkdir -p ${masterdir}
+    echo "Created base dir"
+fi
+#check work dir
+if [ ! -d ${softfile} ]
+then
+    echo
+    mkdir -p ${softfile}
+    echo "Created work dir"
+fi
+#check soft file copy dir
+if [ ! -d ${softfiledir} ]
+then
+    echo
+    mkdir -p ${softfiledir}
+    echo "Created soft file dir"
+fi
+#check soft file error log
+if [ ! -e ${softerror} ]
+then
+    echo
+    touch ${softerror}
+    echo "Flie created error.log"
+fi
+#check summary temp dir
+if [ ! -d ${summarytemp} ]
+then
+    echo
+    mkdir -p ${summarytemp}
+    echo "Created summary file dir"
+fi
+#check soft file upload entry
+if [ ! -e ${softlogentry} ]
+then
+    echo
+    touch ${softlogentry}
+    echo "Created softlog entry file"
+fi
+#summary log entry
+if [ ! -e ${summarylogentry} ]
+then
+    echo
+    touch ${summarylogentry}
+    echo "Created summary log entry"
+fi
+}
+
+#softfiles count for old
+function soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo "Old Soft Files Count : ${file_count}"
+sleep 1
+}
+
+#check old files uploaded or not
+function old_soft_file_check_remove {
+echo
+echo "Upload checking for old soft files..."
+for i in $(ls ${softfiledir})
+do
+        grep -i ${i} ${softlogentry} > /dev/null 2>&1
+        grepreco=$?
+        if [ ${grepreco} -eq 0 ]
+        then
+	    echo
+            echo "This ${i} file already uploaded so it's removing."
+            rm -f ${softfiledir}${i}
+	elif [ ${grepreco} -ne 0 ]
+	then
+	    echo
+	    echo "This soft file not uploaded.. "
+            echo "Upload starting..."
+  	    scp -r ${softfiledir}${i} ${it_programmer}
+	    echo "This ${i} file upload successfull"
+	else
+	    echo
+	    echo "Old soft files nothing to upload..."
+	fi
+done
+}
+
+#Dvd file name creating 
+function dvd_file_name_create {
+dvd_name=$(ls /opt/UploadPoint/ | sed "s/ //g")
+for i in ${dvd_name}
+do
+    softno=$(echo ${i} | cut -d _ -f 2 | sed "s/-//g")
+    softfilename=$(echo soft-${softno}.txt)
+    dvd_batch=${i}
+    soft_file_copy
+done
+}
+
+#soft files copying
+function soft_file_copy {
+for i in ${softfilename}
+do
+     fgrep=$(echo ${i} | cut -d . -f 1)
+     grep -i -w ${fgrep} ${softlogentry} > /dev/null 2>&1
+     if [ $? -eq 0 ]
+     then
+         echo
+	 echo "This ${fgrep} file already upload."
+         echo "This ${dvd_batch} DVD file you can delete"
+         
+         sleep 1
+     elif [ -s /imagedata1/Logs/Upload/${i} ]
+     then
+         find /imagedata1/Logs/Upload/ -iname ${i} -type f -exec cp -p {} ${softfiledir} \; 2> /dev/null
+         sleep 1
+     else
+	 echo
+         echo "Error on the file ${i} copy in /imagedata1/Logs/Upload"
+         echo "If this file is Incremental, Agengy or empty then leave it"
+	 sleep 1
+     fi
+done
+}
+
+#soft file renaming
+function soft_file_rename {
+for i in $(ls ${softfiledir})
+do
+    mv ${softfiledir}${i} ${softfiledir}$(echo ${i} | cut -d . -f 1) 2>> ${softerror}
+done
+}
+
+#current soft files counting
+function current_soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo "Current Soft Files Count : ${file_count}"
+lscount=$(ls ${softfiledir} | wc -l)
+if [ 0 -eq ${lscount} ]
+then
+	echo
+        echo "No soft files for uploading..."
+sleep 1
+else
+	echo
+        echo "Soft files Sending to IT Programmer...."
+fi
+}
+
+#soft files uploading
+function soft_file_upload {
+softfilecount=$(ls ${softfiledir})
+for i in ${softfilecount}
+do
+        grep -i -w ${i} ${softlogentry} > /dev/null 2>&1
+        grepreco=$?
+        softrm=${i}
+        upload
+done
+}
+
+function upload {
+if [ ${grepreco} -ne 0 ]
+then
+        scp -r ${softfiledir}${i} ${it_programmer}
+        sleep 1
+        grep -i ${softrm} ${softlogentry} > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+            echo "$(date +%d/%m/%Y--%R)  ${softrm}  uploaded" >> ${softlogentry}
+            sleep 1
+        else
+	    echo
+            echo "This log already created in softentry.log file"
+        fi
+else
+        echo
+        echo "This file is ${i} Already uploaded"
+        rm -rf ${softfiledir}${i}
+        sleep 1
+fi
+}
+
+#summary files copying 
+function summary_file {
+for i in ${dvd_name}
+do
+   sumval=$(echo ${i} | cut -d - -f2)
+   #echo ${sumval}
+   sumval2=$(echo ${i} | cut -d - -f3,4 | cut -d _ -f 1)
+   #echo ${sumval2}
+   find /imagedata1/Logs/Upload/ -iname "SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log" -type f -exec cp -p {} ${summarytemp} \; 2>/dev/null
+   if [ $? -ne 0 ]
+   then
+       echo
+       echo "Summary report Not avilable this batch ${scan_DOcode}-${sumval}-${sumval2}"
+   else
+       summary_data_colect
+   fi
+done
+}
+
+function summary_data_colect {
+for i in $(ls ${summarytemp}| wc -l)
+do
+    echo "${sumval}" | grep -i H036 > /dev/null 2>&1
+    health=$?
+    echo "${sumval2}" | grep -i IAD > /dev/null 2>&1
+    agency=$?
+    grep -i "Trying to insertdivision_067" /root/kalaiselvan/softfile/summarytemp/SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log > /dev/null 2>&1
+    regular=$?
+    grep -i Incremental /root/kalaiselvan/softfile/summarytemp/SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log > /dev/null 2>&1
+    if [ $? -eq 0 ]
+    then
+	batchno=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i EDMS | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+        date=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i "date of upload" | awk '{ print $NF }' | awk -F- '{ print $NF }' | sed 's/\//-/g' | sed 's/\./-/g')
+        policycount=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -iE 'policy|agency' | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        images=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -i images | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        starttime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $5 }' | cut -d . -f1,2 | sed 's/\./:/g' )
+        endtime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $10 }' | cut -d . -f1,2 | sed 's/\./:/g' )
+	sct=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $5 }'  | sed 's/\./:/g' )
+	ect=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $10 }' | sed 's/\./:/g' )
+	td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+	#echo ${td}
+	grep ${batchno} ${summarylogentry} > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+            echo "${batchno},  ${date},  ${policycount},  ${images},  ${starttime},  ${endtime},  ${td}" >> ${summarylogentry}
+        fi
+    elif [ ${health} -eq 0 ]
+    then
+	batchno=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i EDMS | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+	date=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i "date of upload" | awk '{ print $NF }' | awk -F- '{ print $NF }' | sed 's/\//-/g' | sed 's/\./-/g')
+	policycount=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -iE 'policy|agency' | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+ 	images=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -i images | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        starttime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | cut -d : -f1,2 | sed 's/\./:/g')
+	endtime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | cut -d : -f1,2 | sed 's/\./:/g')
+        sct=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | sed 's/\./:/g')
+	ect==$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | sed 's/\./:/g')
+	td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+	#echo ${td}
+	grep ${batchno} ${summarylogentry} > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+            echo "${batchno},  ${date},  ${policycount},  ${images},  ${starttime},  ${endtime},  ${td}" >> ${summarylogentry}
+        fi
+    elif [ ${agency} -eq 0 ]
+    then
+        batchno=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i EDMS | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+        date=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i "date of upload" | awk '{ print $NF }' | awk -F- '{ print $NF }' | sed 's/\//-/g' | sed 's/\./-/g')
+        policycount=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -iE 'policy|agency' | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        images=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -i images | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        starttime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | cut -d : -f1,2 | sed 's/\./:/g')
+        endtime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | cut -d : -f1,2 | sed 's/\./:/g')
+	sct=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | sed 's/\./:/g')
+	ect=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | sed 's/\./:/g')
+	td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+        #echo ${td}
+	grep ${batchno} ${summarylogentry} > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+            echo "${batchno},  ${date},  ${policycount},  ${images},  ${starttime},  ${endtime},  ${td}" >> ${summarylogentry}
+        fi
+    elif [ ${regular} -eq 0 ]
+    then
+	batchno=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i EDMS | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+        date=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i "date of upload" | awk '{ print $NF }' | awk -F- '{ print $NF }' | sed 's/\//-/g' | sed 's/\./-/g')
+        policycount=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -iE 'policy|agency' | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        images=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i uploaded | grep -i images | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+        starttime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | cut -d : -f1,2 | sed 's/\./:/g')
+        endtime=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | cut -d : -f1,2 | sed 's/\./:/g')
+	sct=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $6 }' | sed 's/\./:/g')
+	ect=$(cat ${summarytemp}SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}*.log | grep -i start | awk '{ print $15 }' | sed 's/\./:/g')
+	td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+        #echo ${td}
+        grep ${batchno} ${summarylogentry} > /dev/null 2>&1
+	if [ $? -ne 0 ]
+	then
+	    echo "${batchno},  ${date},  ${policycount},  ${images},  ${starttime},  ${endtime},  ${td}" >> ${summarylogentry}
+        fi
+    else
+        echo "Not avialble the SummaryReport-${scan_DOcode}-${sumval}\ -${sumval2}"
+    fi
+done
+}
+
+#function calling
+variable
+title
+files_create
+dir_checking
+soft_file_count
+dvd_file_name_create
+soft_file_rename
+current_soft_file_count
+soft_file_upload
+summary_file

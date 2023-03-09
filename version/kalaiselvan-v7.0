@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+clear
+#intilize the variables
+function variable {
+place="Vellore"
+name="kalaiselvan"
+scan_DOcode="RT_073"
+sumlogpath="/imagedata1/Logs/Upload/"
+
+}
+#title card
+function title {
+echo
+echo
+echo -e "                                                     \033[1;32m  LIC ${place} Divisional Office\033[0m"
+echo -e "                                                    \033[4;31mThis script written by $(echo ${name}|tr [a-z] [A-Z])\033[0m"
+echo
+echo -e "                                                                \033[4;35mDISCLAMER\033[0m"
+echo "                                      If you upload the DVD file then  run this command 'kalaiselvan'
+                              it will upload soft files on IT Programmer after you can delete that DVD file.
+                                          upload tracker data also generating in the script."
+echo
+}
+#cleate directory variables
+function file_variable_create {
+masterdir=/root/${name}/
+softfile=/root/${name}/soft-summary/
+softfiledir=/root/${name}/soft-summary/soft/
+summarytemp=/root/${name}/soft-summary/summarytemp/
+softlogentry=/root/${name}/soft-summary/soft.csv
+summarylogentry=/root/${name}/soft-summary/summary.csv
+}
+if [ ! -s ./info.conf ]
+then
+	echo "info.conf file is not avilable!!!"
+	exit 1
+else
+	username=$(grep -i 'username' ./info.conf | awk -F = '{ print $2 }')
+	ipaddr=$(grep -i 'ipaddr' ./info.conf | awk -F = '{ print $2 }')
+fi
+it_programmer="${username}@${ipaddr}:/backup/D067"
+
+#check directory and file
+function dir_checking {
+#check parent dir
+if [ ! -d ${masterdir} ]
+then
+    echo
+    mkdir -p ${masterdir}
+    echo "base directory created."
+fi
+#check work dir
+if [ ! -d ${softfile} ]
+then
+    echo
+    mkdir -p ${softfile}
+    echo "work directory created."
+fi
+#check soft file copy dir
+if [ ! -d ${softfiledir} ]
+then
+    echo
+    mkdir -p ${softfiledir}
+    echo "soft file directory created."
+fi
+#check summary temp dir
+if [ ! -d ${summarytemp} ]
+then
+    echo
+    mkdir -p ${summarytemp}
+    echo "summary directory created."
+fi
+#check soft file upload entry
+if [ ! -e ${softlogentry} ]
+then
+    echo
+    touch ${softlogentry}
+    echo "soft log file created."
+fi
+#summary log entry
+if [ ! -e ${summarylogentry} ]
+then
+    echo
+    touch ${summarylogentry}
+    echo "summary log file created."
+fi
+}
+#soft files count for old
+function old_soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo -e "Checking for old soft bending to upload.\n"
+echo "Old Soft Files Count : ${file_count}"
+
+if [ ${file_count} -ne 0 ]
+then
+    sleep 0.5
+    soft_file_upload
+else
+    echo
+    echo -e "Nothiing to UPLOAD for old soft files.\n moving to new soft upload process..."
+fi
+sleep 1
+}
+#Dvd file name creating
+function dvd_file_name_create {
+cd ${sumlogpath}
+dvd_name=$(ls -tr SummaryReport-RT*.log | tail -n 10 | sed "s/ //g")
+incremental=
+agency=
+health=
+soft_already=
+echo
+for i in ${dvd_name}
+do
+    center=$(echo "${i}" | cut -d _ -f 2 ) # example 073-73P-6172
+    softno=$(echo "${i}" | cut -d _ -f 2 | sed "s/-//g") # example 0737360306
+    softfilename="soft-${softno}.txt" #example soft-0737360306.txt
+    fgrep=$(echo "${softfilename}" | cut -d . -f 1) #example soft-0737360306
+    grep -i -w "${fgrep}" ${softlogentry} > /dev/null 2>&1
+    if [ ${?} -eq 0 ]
+    then
+	#echo
+        #echo "This ${fgrep} file already upload."
+	soft_already=${soft_already}\ ${fgrep}
+        sleep 0.5
+    elif [ -e ${sumlogpath}${softfilename} ]
+    then
+        grep -i IAD "${softfilename}" &> /dev/null 
+        if [ ${?} -ne 0 ]
+	then
+            find ${sumlogpath} -iname ${softfilename} -type f -exec cp -p {} ${softfiledir} \; 2> /dev/null
+            sleep 0.5
+	else
+	    #echo
+	    echo "This ${softfilename} Agency no need to upload.."
+	fi
+    else
+	#echo
+	echo "${i}" | grep -i "[5][0-9][0-9][0-9]" &>/dev/null
+	agen=${?}
+	echo "${i}" | grep -i "[6][0-9][0-9][0-9]" &>/dev/null
+	inc=${?}
+	echo "${i}" | grep -i "[H][0][7][3]" &>/dev/null
+	hel=${?}
+        if [[ ${agen} -eq 0 ]]
+	then
+	    #echo "This ${softfilename} Agency Batch is empty no need.."
+	    agency=${agency}\ ${softfilename} 
+	elif [[ ${inc} -eq 0 ]]
+	then
+	    #echo "This ${softno} Incremental batch not generating soft files.."
+	    incremental=${incremental}\ ${center}
+	elif [[ ${hel} -eq 0 ]]
+	then
+	    #echo "This ${softfilename} Helth batch no need to upload.."
+	    health=${health}\ ${softfilename}
+	else
+	    echo "Something error occured.."
+	fi
+    fi
+done
+echo "This soft files already uploaded.."
+echo ${soft_already}
+sleep 1
+if [[ ! -z ${incremental} ]]
+then
+    echo
+    echo "This Incremental batchs not generating softfiles"
+    echo ${incremental}
+    sleep 1
+fi
+if [[ ! -z ${health} ]]
+then
+    echo
+    echo "This Health files no need send "
+    echo ${health}
+    sleep 1
+fi
+if [[ ! -z ${agency} ]]
+then
+    echo
+    echo "This Agency files no need to send "
+    echo ${agency}
+    sleep 1
+fi
+}
+
+variable
+title
+file_variable_create
+dir_checking
+old_soft_file_count

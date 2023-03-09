@@ -1,0 +1,274 @@
+#!/bin/bash
+clear
+echo 
+echo -e "LIC Machilipatnam DO"
+echo -e "This script writed by KALAISELVAN"
+echo
+echo -e "DISCLAMER"
+echo "If you upload the DVD file then don't delete the DVD file run this command 'kalaiselvan' it will upload files on IT Programmer after you can delete that DVD file."
+
+if [ ! -s ./info.conf ]
+then
+	echo "info.conf file is not avilable!!!"
+	exit 1
+else
+	username=$(grep -i 'username' ./info.conf | awk -F = '{ print $2 }')
+	ipaddr=$(grep -i 'ipaddr' ./info.conf | awk -F = '{ print $2 }')
+fi
+name=kalaiselvan
+masterdir=/root/${name}/
+softfile=/root/${name}/softfile/
+softfiledir=/root/${name}/softfile/soft/
+softerror=/root/${name}/softfile/error.log
+softlog=/root/${name}/softfile/soft.log
+summarytemp=/root/${name}/softfile/summarytemp/
+softlogentry=/root/${name}/softfile/softentry.log
+summarylogentry=/root/${name}/softfile/summaryentry.log
+function dir_checking {
+if [ ! -d ${masterdir} ]
+then
+    echo
+    mkdir -p ${masterdir}
+    echo "Created base dir"
+    echo
+#else
+#    echo "checked ${masterdir}"
+fi
+if [ ! -d ${softfile} ]
+then
+    echo
+    mkdir -p ${softfile}
+    echo "Created work dir"
+    echo
+#else
+#    echo "checked ${softfile}"
+fi
+if [ ! -d ${softfiledir} ]
+then
+    echo
+    mkdir -p ${softfiledir}
+    echo "Created soft file dir"
+    echo
+#else
+#    echo "checked ${softfiledir}"
+fi
+if [ ! -e ${softerror} ]
+then
+    echo 
+    touch ${softerror}
+    echo "Flie created error.log"
+    echo
+#else
+#    echo "checked ${softerror}"
+fi
+if [ ! -e ${softlog} ]
+then
+    echo
+    touch ${softlog}
+    echo "Created soft.log file"
+    echo
+#else
+#    echo "checked ${softlog}"
+fi
+if [ ! -d ${summarytemp} ]
+then
+    echo
+    mkdir -p ${summarytemp}
+    echo "Created summary file dir"
+    echo
+#else
+#    echo "checked ${summarytemp}"
+fi
+if [ ! -e ${softlogentry} ]
+then
+    echo
+    touch ${softlogentry}
+    echo "Created softlog entry file"
+    echo
+fi
+if [ ! -e ${summarylogentry} ]
+then
+    echo
+    touch ${summarylogentry}
+    echo "Created summary log entry"
+    echo
+fi
+}
+function soft_log_empty_check {
+[ -s ${softlog} ]
+if [ $? -ne 0 ]
+then
+    echo
+    echo "soft-7547935763" >> ${softlog}
+else
+    echo
+    echo "rotate soft log reading..."
+    sleep 0.5
+    echo "DONE."
+fi
+}
+function soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo "Old Soft Files Count : ${file_count}"
+echo
+sleep 1
+}
+function old_soft_file_check_remove {
+echo "Old soft file upload checking..."
+#echo
+for i in $(ls ${softfiledir})
+do 
+	#echo ${i}
+	grep -i ${i} ${softlog} > /dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+	    echo "This ${i} file already uploaded so it's removing."
+	    rm -f ${softfiledir}${i}
+fi
+done
+if [ $? -eq 0 ]
+then
+    echo
+    echo "Old soft file nothing to upload.."
+fi
+echo
+}
+function dvd_file_name_create {
+dvd_name=$(ls /opt/UploadPoint/ | sed "s/ //g")
+echo "Soft files copying sucessfull..."
+echo
+for i in ${dvd_name}
+do
+    softno=$(echo ${i} | cut -d _ -f 2 | sed "s/-//g")
+    softfilename=$(echo soft-${softno}.txt)
+    #echo ${softfilename}
+    dvd_batch=${i}
+    soft_file_copy
+done
+#ls ${softfiledir}
+}
+function soft_file_copy {
+for i in ${softfilename}
+do   
+     fgrep=$(echo ${i} | cut -d . -f 1)
+     grep -i ${fgrep} ${softlog} > /dev/null 2>&1
+     if [ $? -eq 0 ]
+     then
+         echo "This ${fgrep} file already upload."
+	 echo "This ${dvd_batch} DVD file you can delete"
+	 #echo "This DVD file you can delete"
+         echo 
+	 sleep 0.5
+         #exit 1
+     elif [ -s /imagedata1/Logs/Upload/${i} ]
+     then
+         find /imagedata1/Logs/Upload/ -iname ${i} -type f -exec cp -p {} ${softfiledir} \; 2> /dev/null
+         sleep 0.5
+     else
+         echo "Error on the file ${i} copy in /imagedata1/Logs/Upload"
+	 echo "If this file is Incremental then leave it"
+	 echo
+     fi
+done
+#echo "soft copy working"
+}
+function soft_file_rename {
+for i in $(ls ${softfiledir})
+do
+    #echo ${i}
+    mv ${softfiledir}${i} ${softfiledir}$(echo ${i} | cut -d . -f 1) 2>> ${softerror}
+done
+#ls ${softfiledir}
+#echo "rename working"
+}
+function soft_file_upload {
+#echo $(cat ${softlog})
+softfilecount=$(ls ${softfiledir})
+#echo ${softfilecount}
+for i in ${softfilecount}
+do
+	#echo ${i}
+        grep ${i} ${softlog} > /dev/null 2>&1
+        grepsoft=$?
+        softrm=${i}
+        upload
+done
+}
+function upload {
+if [ ${grepsoft} -ne 0 ]
+then
+        echo ${softrm} >> ${softlog}
+        #echo "it worked ${i}"
+	scp -r ${softfiledir}${i} ${username}@${ipaddr}:/backup/D067
+	sleep 0.5
+        grep -i ${softrm} ${softlogentry} > /dev/null 2>&1
+        if [ $? -ne 0 ]
+	then
+	    echo "$(date +%d/%m/%Y--%R)  ${softrm}  uploaded" >> ${softlogentry}
+	    sleep 0.5
+        else
+            echo "This log already created in softentry.log file"
+	    echo
+        fi
+else
+    echo "This file is ${i} Already uploaded"
+    rm -rf ${softfiledir}${i}
+    sleep 0.5
+    echo
+fi
+}
+function summary_file_copy {
+for i in ${dvd_name}
+do
+   sumval=$(echo ${i} | cut -d - -f2)
+   #echo ${sumval}
+   sumval2=$(echo ${i} | cut -d - -f3,4 | cut -d _ -f 1)
+   #echo ${sumval2}
+   find /imagedata1/Logs/Upload/ -iname "SummaryReport-AI_067-${sumval}\ -${sumval2}*.log" -type f -exec cp -p {} ${summarytemp} \; 2>/dev/null
+done
+#ls ${summarytemp}
+}
+function summary_report {
+for i in $(ls ${summarytemp})
+do 
+    echo ${i}
+done
+}
+function current_soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo "Current Soft Files Count : ${file_count}"
+echo
+lscount=$(ls ${softfiledir} | wc -l) 
+if [ 0 -eq ${lscount} ]
+then
+	echo "No soft files for uploading..."
+echo
+sleep 1
+else 
+	echo "Soft files Sending to IT Programmer...."
+	echo
+fi
+}
+
+function soft_log_size_monitor {
+softlogline=$(cat ${softlog} | wc -l)
+if [ ${softlogline} -gt 50 ]
+then
+	echo "temp soft log reduceing the size"
+	sed -i '1,25d' ${softlog}
+fi
+}
+
+dir_checking
+soft_log_empty_check
+soft_file_count
+old_soft_file_check_remove
+dvd_file_name_create
+soft_file_rename
+current_soft_file_count
+soft_file_upload
+soft_log_size_monitor
+#summary_file_copy
+#summary_report

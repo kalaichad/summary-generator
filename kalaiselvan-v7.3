@@ -1,0 +1,548 @@
+#!/usr/bin/env bash
+clear
+#intilize the variables
+function variable {
+place="Vellore"
+name="kalaiselvan"
+scan_DOcode="RT_073"
+sumlogpath="/imagedata1/Logs/Upload/"
+
+coordinator="/root/co"
+}
+function req_ment {
+which -a sshpass &> /dev/null
+if [ ${?} -ne 0 ]
+then
+    echo "sshpass command not found. You need to install that."
+    exit 1
+fi 
+}
+#title card
+function title {
+echo
+echo
+echo -e "                                                     \033[1;32m  LIC ${place} Divisional Office\033[0m"
+echo -e "                                                    \033[4;31mThis script written by $(echo KALAISELVAN |tr [a-z] [A-Z])\033[0m"
+echo
+echo -e "                                                                \033[4;35mDISCLAMER\033[0m"
+echo "                                      If you upload the DVD then after run this command 'kalaiselvan'
+                                     it will upload the soft files to IT and summary report generating.
+                                            upload tracker data also generating in the script."
+}
+
+if [ ! -s ./info.conf ]
+then
+	echo "info.conf file is not avilable!!!"
+	exit 1
+else
+	username=$(grep -i 'username' ./info.conf | awk -F = '{ print $2 }')
+	ipaddr=$(grep -i 'ipaddr' ./info.conf | awk -F = '{ print $2 }')
+fi
+it_programmer="${username}@${ipaddr}:/backup/D067"
+
+#cleate directory variables
+function file_variable_create {
+codir=/root/co/
+masterdir=/root/${name}/
+softfile=/root/${name}/soft-summary/
+softfiledir=/root/${name}/soft-summary/soft/
+summarytemp=/root/${name}/soft-summary/summarytemp/
+softlogentry=/root/${name}/soft-summary/soft.csv
+summarylogentry=/root/${name}/soft-summary/summary.csv
+co_soft=/root/${name}/soft-summary/co_soft
+}
+#check directory and file
+function dir_checking {
+#check parent dir
+if [ ! -d ${masterdir} ]
+then
+    echo
+    mkdir -p ${masterdir}
+    echo "base directory created."
+fi
+#check work dir
+if [ ! -d ${softfile} ]
+then
+    echo
+    mkdir -p ${softfile}
+    echo "work directory created."
+fi
+#check soft file copy dir
+if [ ! -d ${softfiledir} ]
+then
+    echo
+    mkdir -p ${softfiledir}
+    echo "soft file directory created."
+fi
+#check summary temp dir
+if [ ! -d ${summarytemp} ]
+then
+    echo
+    mkdir -p ${summarytemp}
+    echo "summary directory created."
+fi
+#check soft file upload entry
+if [ ! -e ${softlogentry} ]
+then
+    echo
+    touch ${softlogentry}
+    echo "soft log file created."
+fi
+#summary log entry
+if [ ! -e ${summarylogentry} ]
+then
+    echo
+    touch ${summarylogentry}
+    echo "summary log file created."
+fi
+#soft csv and TXT copy dir
+if [ ! -d ${codir} ]
+then
+    echo
+    mkdir ${codir}
+fi
+if [ ! -d ${co_soft} ]
+then
+    echo 
+    mkdir ${co_soft}
+fi
+branch=$(ls ${co_soft} | wc -l)
+if [ ${branch} -ne 23 ]
+then 
+    mkdir ${co_soft}/{732,733,735,736,737,738,7276,7277,71C,71E,71H,71K,71Q,71R,71T,71Y,73N,73P,73R,73S,73T,73V,H073}
+    echo "Branch Directory created..."
+fi
+}
+#check communication server is online
+function communication {
+ping -c 3 10.66.190.50 > /dev/null 2>&1
+if [ ${?} -ne 0 ]
+then
+    echo "Communication server is offline.."
+    sleep 1
+    exit 1
+fi
+}
+#checking old DVD soft csv and TXT
+function coordinator {
+filecount=$(ls ${codir} | wc -l)
+if [ ${filecount} -ne 0 ]
+then
+    echo
+    echo -e "$(ls ${codir}) \n\nThis Files sent (or) not to Ganesh"
+    echo
+    read -p "If u sent then type 'YES' not sent 'NO' (OR) 'FORECE' : " option
+    option1=$(echo "${option}" | tr [:upper:] [:lower:])
+    if [ ${option1} == "yes" ] || [ ${option1} == "y" ]
+    then
+	sleep 1
+        echo "copyed DVD csv and txt files are deleting.."
+        rm -f ${codir}/*
+    elif [ ${option1} == "no" ] || [ ${option1} == "n" ]
+    then
+        echo
+        echo "Then sent the files after update the data BYE..."
+        echo
+        exit 1
+    elif [ ${option1} == "force" ] || [ ${option1} == "f" ]
+    then
+        echo 
+	echo "Already avilable txt and csv not deleting its continue the process.."
+    else
+	clear
+	title
+	echo
+	echo "You are Enter the wrong option type 'YES' or 'NO'"
+        coordinator
+    fi 
+fi
+}
+#soft files count for old
+function old_soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo -e "Checking for old soft bending to upload.\n"
+echo "Old Soft Files Count : ${file_count}"
+
+if [ ${file_count} -ne 0 ]
+then
+    sleep 1
+    soft_file_upload
+else
+    echo
+    sleep 1
+    echo -e "Nothiing to UPLOAD for old soft files.\nmoving to new soft upload process... WAIT"
+fi
+sleep 1
+}
+#Dvd file name creating
+function dvd_file_name_create {
+cd ${sumlogpath}
+dvd_name=$(ls -tr SummaryReport-RT*.log | tail -n 10 | sed "s/ //g")
+incremental=
+agency=
+health=
+soft_already=
+for i in ${dvd_name}
+do
+    center=$(echo "${i}" | cut -d _ -f 2 )  # example 073-73P-6172
+    softno=$(echo "${i}" | cut -d _ -f 2 | sed "s/-//g")  # example 0737360306
+    softfilename="soft-${softno}.txt"  #example soft-0737360306.txt
+    fgrep=$(echo "${softfilename}" | cut -d . -f 1)  #example soft-0737360306
+    grep -i -w "${fgrep}" ${softlogentry} &> /dev/null 
+    if [ ${?} -eq 0 ]
+    then
+	#echo
+        #echo "This ${fgrep} file already upload."
+	soft_already=${soft_already}\ ${fgrep}
+        sleep 0.5
+    elif [ -e ${sumlogpath}${softfilename} ]
+    then
+        find ${sumlogpath} -iname ${softfilename} -type f -exec cp -p {} ${co_soft} \; 2> /dev/null
+	if [ ${?} -eq 0 ]
+	then
+	    for i in 732 733 735 736 737 738 7276 7277 71C 71E 71H 71K 71Q 71R 71T 71Y 73N 73P 73R 73S 73T 73V H073
+	    do
+		ls ${co_soft}/${softfilename} | grep -i "soft-073${i}" &> /dev/null
+		if [ ${?} -eq 0 ]
+		then
+		    mv ${co_soft}/${softfilename} ${co_soft}/${i}/ &> /dev/null
+		    echo "${softfilename} is copied to branch"
+    		    break
+		fi 
+	    done
+	fi
+        echo ${softfilename} | grep -i "IAD" &> /dev/null
+        agencyerrco=${?}
+	#echo "${softfilename} soft name"
+        #echo ${agencyerrco}
+	echo ${softfilename} | grep -i "H073" &> /dev/null
+        healtherrco=${?} 
+        if [ ${agencyerrco} -ne 0 ]
+	then
+	    if [ ${healtherrco} -ne 0 ]
+	    then
+                find ${sumlogpath} -iname ${softfilename} -type f -exec cp -p {} ${softfiledir} \; 2> /dev/null
+                sleep 0.5
+	    else
+		health=${health}\ ${softfilename} #example soft-073H07360306.txt
+	    fi
+	else
+	    #echo
+	    #echo "This ${softfilename} Agency no need to upload.."
+	    agency=${agency}\ ${softfilename} #example soft-0737360306.txt
+	fi
+    else
+	#echo
+	echo "${i}" | grep -i "[5][0-9][0-9][0-9]" &>/dev/null
+	agen=${?}
+	echo "${i}" | grep -i "[6][0-9][0-9][0-9]" &>/dev/null
+	inc=${?}
+	echo "${i}" | grep -i "[H][0][7][3]" &>/dev/null
+	hel=${?}
+        if [[ ${agen} -eq 0 ]]
+	then
+	    #echo "This ${softfilename} Agency Batch is empty no need.."
+	    agency=${agency}\ ${softfilename} #example soft-0737360306.txt
+	elif [[ ${inc} -eq 0 ]]
+	then
+	    #echo "This ${softno} Incremental batch not generating soft files.."
+	    incremental=${incremental}\ ${center} # example 073-73P-6172
+	elif [[ ${hel} -eq 0 ]]
+	then
+	    #echo "This ${softfilename} Helth batch no need to upload.."
+	    health=${health}\ ${softfilename}  #example soft-073H07360306.txt
+	else
+	    echo -e "\033[4;31mSomething Not Correct.. Please Check it \033[0m"
+	fi
+    fi
+done
+if [[ ! -z ${soft_already} ]]
+then
+    echo
+    echo "This soft files are already uploaded.."
+    echo ${soft_already}
+    sleep 1
+fi
+if [[ ! -z ${incremental} ]]
+then
+    echo
+    echo "This Incremental batchs not generating softfiles"
+    echo ${incremental}
+    sleep 1
+fi
+if [[ ! -z ${health} ]]
+then
+    echo
+    echo "This Health files no need to send "
+    echo ${health}
+    sleep 1
+fi
+if [[ ! -z ${agency} ]]
+then
+    echo
+    echo "This Agency files no need to send "
+    echo ${agency}
+    sleep 1
+fi
+}
+#check old files uploaded or not
+function soft_file_upload {
+#soft_file_rename
+softfilecount=$(ls ${softfiledir})
+for i in ${softfilecount}
+do
+	j=$(echo ${i} | cut -d . -f 1)
+        grep -i -w "${j}" ${softlogentry} > /dev/null 2>&1
+        if [ ${?} -ne 0 ]
+        then
+            echo "${i}" | grep -i "IAD" > /dev/null 2>&1
+	    agenco=${?}
+            if [ ${agenco} -ne 0 ]
+            then
+                sshpass -p "todo" scp -r ${softfiledir}${i} ${it_programmer} 2> /dev/null
+                if [ ${?} -eq 0 ]
+                then
+                    echo
+                    echo "This ${i} file upload successfull"
+		    keyer=${?}
+                    sleep 0.5
+		    rm -f ${softfiledir}${i}
+		else
+		    echo "Error to upload check the connectivity on communication server!!"
+		    keyer=1
+                fi
+            else
+                echo
+                #echo "This ${i} file is Agency so no need to upload"
+                rm -f ${softfiledir}${i}
+	    fi
+            grep -i "${j}" ${softlogentry} > /dev/null 2>&1
+            if [ ${?} -ne 0 ] && [ ${keyer} -eq 0 ] 
+            then
+		echo "${i}" | grep -i "IAD" > /dev/null 2>&1
+		if [ ${?} -ne 0 ]
+		then
+                    #echo "$(date +%d/%m/%Y--%R)  ${j}  no_need" >> ${softlogentry} # 03/11/2022--14:58  soft-0737277IAD5003  no_need
+		#else
+		    echo "$(date +%d/%m/%Y--%R)  ${j}  uploaded" >> ${softlogentry} # 01/11/2022--16:50  soft-0737360306      uploaded
+		fi
+	    else
+		echo "File is not upload due to the connectivity probelm!!"
+            fi    
+        else
+            if [ -e ${softfiledir}${i} ]
+            then
+                echo
+                echo "This file is ${i} Already uploaded so it's removing."
+                rm -f ${softfiledir}${i}
+            fi
+        fi
+done
+}
+#current soft files counting
+function current_soft_file_count {
+file_count=$(ls ${softfiledir} | wc -l)
+echo
+echo "New Soft Files Count : ${file_count}"
+if [ 0 -eq ${file_count} ]
+then
+        echo
+        echo "soft files zero for uploading..."
+        sleep 0.5
+else
+        echo
+        echo "New soft files avilable and sending to IT..."
+        sleep 0.5
+        soft_file_upload
+fi
+}
+#uploaded summary files copying
+function summary_file {
+echo
+sum_already=      # 073-71Q-IAD-5007
+for i in ${dvd_name}
+do
+   batchcheck=$(echo "${i}" | cut -d _ -f 2)   # 073-71H-6231
+   grep -i ${batchcheck} ${summarylogentry} &> /dev/null
+   if [[ ${?} -ne 0 ]]
+   then
+       sumval=$(echo "${i}" | cut -d - -f2,3)  #RT_073-73P
+       sumval3=$(echo ${sumval} | sed 's/RT_//g' | sed 's/-//g') #073-73P
+       sumval2=$(echo "${i}" | cut -d - -f4,5 | cut -d _ -f 1) # 6231 batch number
+       find ${sumlogpath} -iname "SummaryReport-${sumval}*-${sumval2}*.log" -type f -exec cp -p {} ${summarytemp}/SummaryReport-${scan_DOcode}-${sumval}-${sumval2}\.log \; 2>/dev/null
+       if [ ${?} -ne 0 ]
+       then
+           echo "Summary report Not avilable on this batch ${scan_DOcode}-${sumval} -${sumval2}!!"
+       fi
+   else
+       sum_already=${sum_already}\ ${batchcheck}
+   fi
+   #echo ${sumval3}${sumval2}
+done
+echo "This batch logs already created"
+echo ${sum_already}
+}
+# summary file remover
+function sumremove {
+reg_sec=$(ls ${summarytemp} | wc -l)
+if [ ${reg_sec} -ne 0 ]
+then
+    rm -f ${summarytemp}"${sumremover}"
+fi
+}
+#Health,agency,incrmental Batch TXT copy to /root/co
+function txtcopy {
+for i in ${othertxt}
+do
+    grep "${i}" ${summarylogentry} &> /dev/null
+    if [ ${?} -ne 0 ]
+    then
+	txt="$(echo ${i} | sed 's/-/*/g')" #073*73V*6170     
+	find /imagedata1/UploadPoint -iname "*${txt}*.TXT" -type f -exec cp -p {} ${coordinator} \; 2>/dev/null
+        if [ ${?} -ne 0 ]
+	then
+    	    echo "Error to copy the file ${i}.TXT.."
+        fi
+    else
+        echo "This TXT file already copied on the /root/co!!!"
+    fi
+done
+}
+#regular file csv file copy to /root/co
+function csvcopy {
+#echo ${regcsv}
+for i in ${regcsv}
+do
+    newg=$(echo ${i} | cut -d . -f 1)
+    grep ${newg} ${softlogentry} &> /dev/null
+    if [ ${?} -eq 0 ]
+    then
+        find /imagedata1/UploadPoint/ -iname "${i}" -type f -exec cp -p {} ${coordinator} \; 2>/dev/null
+        if [ ${?} -ne 0 ]
+        then
+            echo "Error to copy the file ${i}.."
+        fi
+    else
+        echo "This csv file already copyid on the /root/co!!!"
+    fi
+done
+}
+#update the summary report on csv file
+function report {
+grep "${batchno}" ${summarylogentry} > /dev/null 2>&1
+if [ ${?} -ne 0 ]
+then
+    echo 
+    echo "${types} Summary log created for this batch ${batchno}.."
+    echo "${doc},  ${batchno},  ${date},  ${policycount},  ${images},  ${starttime},  ${endtime},  ${td}" >> ${summarylogentry}
+fi
+}
+#summary file policy, images, time data collecting 
+function sumdata {
+batchno=$(cat ${summarytemp}${i} | grep -i "EDMS" | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+date=$(cat ${summarytemp}${i} | grep -Eow "[0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]|[0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][0-9][0-9]" | sed 's/\//-/g' | sed 's/\./-/g' | sed 's/\:/-/g' | head -n 1)
+policycount=$(cat ${summarytemp}${i} | grep -i "uploaded" | grep -iE "policy|agency" | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+images=$(cat ${summarytemp}${i} | grep -i "uploaded" | grep -i "images" | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+starttime=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' | awk NR==1 | cut -b 1-5 | sed 's/\./:/g')
+endtime=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]'|awk NR==2 | cut -d " " -f 2 | cut -b 1-5 | sed 's/\./:/g')
+sct=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' | awk NR==1 | sed 's/\./:/g')
+ect=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]'|awk NR==2 | cut -d " " -f 2 | sed 's/\./:/g')
+td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+}
+#summary date fetching in files
+function summary_data_colect {
+regcsv=
+othertxt=
+for i in $(ls ${summarytemp})
+do
+    batchno=$(cat ${summarytemp}${i} | grep -i "EDMS" | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+    if [ -z ${batchno} ]
+    then
+        echo "This ${batchno} summary file is empty PLEASE check it."
+        exit 1
+    fi
+    sumremover="${i}"
+    grep ${batchno} ${summarylogentry} &> /dev/null
+    if [ ${?} -ne 0 ]
+    then
+        echo "${i}" | grep -i "H073" > /dev/null 2>&1
+        health=${?}
+        echo "${i}" | grep -iE "IAD|[5][0-9][0-9][0-9]" > /dev/null 2>&1
+        agency=${?}
+        echo "${i}" | grep -i "[0][0-9][0-9][0-9]" > /dev/null 2>&1
+        regular=${?}
+        echo "${i}" | grep -i "[6][0-9][0-9][0-9]" > /dev/null 2>&1
+        if [ ${?} -eq 0 ]
+        then
+            #incremental section
+            batchno=$(cat ${summarytemp}${i} | grep -i "EDMS" | awk '{ print $9 $10 }' | awk -F[ '{ print $2 }' | awk -F] '{ print $1 }')
+            date=$(cat ${summarytemp}${i} | grep -Eow "[0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]|[0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][0-9][0-9]" | sed 's/\//-/g' | sed 's/\./-/g' | sed 's/\:/-/g' | head -n 1)
+            policycount=$(cat ${summarytemp}${i} | grep -i "uploaded" | grep -i "policy" | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+            images=$(cat ${summarytemp}${i} | grep -i "uploaded" | grep -i "images" | awk '{ print $NF }' | awk -F[ '{print $2}' | awk -F] '{ print $1 }')
+            starttime=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' | awk NR==1 | cut -b 1-5 | sed 's/\./:/g')
+            endtime=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]'|awk NR==2 | cut -d " " -f 2 | cut -b 1-5 | sed 's/\./:/g')
+            sct=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' | awk NR==1  | sed 's/\./:/g')
+	    ect=$(cat ${summarytemp}${i} | grep -Eow '[0-9][0-9].[0-9][0-9].[0-9][0-9]|[0-9][0-9]:[0-9][0-9]:[0-9][0-9]'|awk NR==2 | cut -d " " -f 2 | sed 's/\./:/g')
+            td=$(date -u -d "0 $(date -u -d "${ect}" +"%s") sec - $(date -u -d "${sct}" +"%s") sec" +"%H:%M:%S")
+	    types=Incremental
+	    doc=ID
+	    othertxt=${batchno}
+	    #echo ${othertxt}
+	    txtcopy
+	    report
+	    sumremove
+        elif [ ${health} -eq 0 ]
+        then
+            #agengy batch
+	    types=Health
+	    doc=HD
+            sumdata
+	    othertxt=${batchno}
+	    txtcopy
+	    report
+	    sumremove
+        elif [ ${agency} -eq 0 ]
+        then
+            #agengy section
+	    types=Agency
+	    doc=IAD
+            sumdata
+	    othertxt=${batchno}
+	    txtcopy
+	    report
+	    sumremove
+        elif [ ${regular} -eq 0 ]
+        then
+            #regular section
+	    types=Regular
+	    doc=PD
+	    sumdata
+	    regcsv="soft-$(echo ${batchno} | sed 's/-//g').csv"
+	    csvcopy
+	    report
+	    sumremove
+        else
+            echo "That file not contain information is missing ${i}"
+        fi
+    fi
+done
+}
+
+req_ment
+variable
+title
+file_variable_create
+dir_checking
+communication
+coordinator
+old_soft_file_count
+dvd_file_name_create
+current_soft_file_count
+summary_file
+summary_data_colect
+#csvcopy
+echo
+echo "To check Summary log use the 'summaryreport'"
+echo "To check soft upload report 'softreort'"
+echo

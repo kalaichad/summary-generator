@@ -1,0 +1,131 @@
+#!/bin/bash
+clear
+#truncate -s 0 /root/kalaiselvan/softfile/error.log
+#echo 
+#echo " Script writed by KALAISELVAN "
+#echo
+#echo " Soft File sending to IT Programmer "
+#echo
+softfile=/root/kalaiselvan/softfile/
+softdir=/root/kalaiselvan/softfile/soft/
+softerror=/root/kalaiselvan/softfile/error.log
+softlog=/root/kalaiselvan/softfile/soft.log
+summarytemp=/root/kalaiselvan/softfile/summarytemp/
+function checking {
+if [ ! -d ${softfile} ]
+then 
+    mkdir -p ${softfile}
+    echo "working ${softfile}"
+    if [ ! -d ${softdir} ]
+    then 
+	mkdir -p ${softdir}
+	echo "working ${softdir}"
+    fi
+fi
+if [ ! -e ${softerror} ]
+then
+    touch ${softerror}
+    echo "working ${softerror}"
+fi
+#echo "checking working"
+if [ ! -e ${softlog} ]
+then
+    touch ${softlog}
+    echo "workign ${softlog}"
+fi
+
+if [ ! -d ${summarytemp} ]
+then
+    mkdir -p ${summarytemp}
+    echo "working ${summaerytemp}"
+fi
+}
+function errorlog {
+grep -w "\[$(date +%d-%m-%Y)\]" ${softerror}
+errorreco=$?
+#echo "date grep is working ${errorreco}"
+if [ ${errorreco} -ne 0 ]
+then
+	echo "-------------------------------------[$(date +%d-%m-%Y)]---------------------------------------" 1>> ${softerror}
+	echo "working date inserted"
+fi
+}
+function dir_count {
+dir_count=$(ls -l ${softdir} | wc -l)
+#echo "softdir working"
+odir_count=$( expr ${dir_count} -  1 )
+echo "Soft Files : ${odir_count}"
+#echo "dir count working"
+}
+
+echo
+function dvd_file_create { 
+dvd_name=$(ls -l /opt/UploadPoint | cut -d " " -f 9,10 | sed "s/ //g ")
+#echo ${dvd_name}
+for i in ${dvd_name}
+do 
+	softno=$(echo ${i} | cut -d _ -f 2 | sed "s/-//g")
+	#echo ${softno}
+	softfile=$(echo soft-${softno}.txt)
+	#echo ${softfile}
+	find /imagedata1/Logs/Upload/ -iname ${softfile} -type f -exec cp {} ${softdir} \; 2> /dev/null
+        #echo "working soft file create"
+done
+#echo "dvd file create working"
+}
+function softfile_rename {
+for i in $(ls ${softdir})
+do 
+	#echo ${i}
+	mv ${softdir}${i} ${softdir}$(echo ${i} | cut -d . -f 1) 2>> ${softerror}
+        #echo "softfile rename working"
+done
+#echo "softfile rename woring"
+}
+#echo ${dvd_name}
+function summarycopy {
+for i in ${dvd_name}
+do
+	#echo ${i}
+	sumval=$(echo ${i} | cut -d - -f2)
+	#echo ${sumval}
+	sumval2=$(echo ${i} | cut -d - -f3 | cut -d _ -f 1)
+	#echo ${sumval2}
+	cp -p /imagedata1/Logs/Upload/SummaryReport-AI_067-${sumval}\ -${sumval2}*.log ${summarytemp}
+
+done
+}
+function remote_copy {
+echo "Soft File sending IT programmer......."
+for i in $(ls /root/kalaiselvan/softfile/soft)
+do
+	#echo ${i}
+	scp -r /root/kalaiselvan/softfile/soft/${i} root@10.82.242.13:/root/kalaiselvan/temp/
+	sleep 0.5
+done
+}
+function policy_docket {
+#grep -w "\[$(date +%d-%m-%Y)\]" /root/kalaiselvan/softfile/soft.log > /devnull 2>&1
+#datereco=$?
+docket=$(echo ${dvd_name} | cut -d "-" -f 3 | cut -d "_" -f 1)
+docket1=$(grep -wl ${docket} ${summarytemp}* )
+echo ${docket}
+echo ${docket1} 
+}
+#errorlog
+checking
+dir_count
+dvd_file_create
+softfile_rename
+summarycopy
+#remote_copy
+policy_docket
+#log_report
+#ls -l /root/kalaiselvan/softfile/soft
+function errorcheck {
+if [ -s ${softerror} ]
+then
+    echo "Error occured....."
+fi
+}
+
